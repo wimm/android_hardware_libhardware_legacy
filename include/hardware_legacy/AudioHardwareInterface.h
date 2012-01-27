@@ -86,6 +86,9 @@ public:
      * status based on include/utils/Errors.h
      */
     virtual status_t    standby() = 0;
+//#ifdef SLSI_S5P6442
+	virtual status_t    endStream() = 0;
+//#endif
 
     /** dump the state of the audio output device */
     virtual status_t dump(int fd, const Vector<String16>& args) = 0;

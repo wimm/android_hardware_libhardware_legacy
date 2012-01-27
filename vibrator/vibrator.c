@@ -21,7 +21,10 @@
 #include <fcntl.h>
 #include <errno.h>
 
-#define THE_DEVICE "/sys/class/timed_output/vibrator/enable"
+/* wuhua 20100915 modify begin: modify sys file*/
+/* #define THE_DEVICE "/sys/class/timed_output/vibrator/enable" */
+#define THE_DEVICE "/sys/class/leds/vibrator/enable"
+/* wuhua 20100915 modify end: modify sys file */
 
 static int sendit(int timeout_ms)
 {

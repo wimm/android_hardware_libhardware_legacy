@@ -14,5 +14,13 @@ ifeq ($(USE_QEMU_GPS_HARDWARE),true)
     LOCAL_SRC_FILES += gps/gps_qemu.c
 endif
 
+# guanxiaowei 20100729 begin: add this function to find gps_hardware.c
+ifeq ($(USE_FOXCONN_GPS_HARDWARE),true)
+    LOCAL_CFLAGS    += -DHAVE_GPS_HARDWARE
+    LOCAL_SRC_FILES += gps/gps_hardware.c
+endif
+#  guanxiaowei 20100729 end: add this function to find gps_hardware.c
+
+
 LOCAL_SRC_FILES += gps/gps.cpp
 

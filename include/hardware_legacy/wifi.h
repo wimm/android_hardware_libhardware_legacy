@@ -21,6 +21,12 @@
 extern "C" {
 #endif
 
+//For save global mac address
+#define ENV_MACADDR	"dev.macaddr"
+#define CYBERTAN_ID	"00:01:36:"
+#define MAC_ID_LEN	9
+#define MAC_ADDR_LEN	17
+
 /**
  * Load the Wi-Fi driver.
  *
@@ -163,6 +169,13 @@ int do_dhcp_request(int *ipaddr, int *gateway, int *mask,
  * Return the error string of the last do_dhcp_request().
  */
 const char *get_dhcp_error_string();
+
+/*qianliangliang add 20100906 begin*/
+/**
+ *Return the mac address by wifi
+ */
+int get_mac_address(char *buf);
+/*qianliangliang add 20100906 end*/
 
 #if __cplusplus
 };  // extern "C"

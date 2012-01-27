@@ -33,6 +33,8 @@
 #include <sys/_system_properties.h>
 #endif
 
+/* Isaac, for disabling obsoleted codes of archermind */
+#define __OBSOLETE__
 static struct wpa_ctrl *ctrl_conn;
 static struct wpa_ctrl *monitor_conn;
 
@@ -48,12 +50,16 @@ static char iface[PROPERTY_VALUE_MAX];
 // TODO: use new ANDROID_SOCKET mechanism, once support for multiple
 // sockets is in
 
+/* qianliangliang 20100722 begin */
 #ifndef WIFI_DRIVER_MODULE_PATH
-#define WIFI_DRIVER_MODULE_PATH         "/system/lib/modules/wlan.ko"
+//#define WIFI_DRIVER_MODULE_PATH         "/system/lib/modules/wlan.ko"
+#define WIFI_DRIVER_MODULE_PATH			 "/system/lib/modules/dhd.ko"
 #endif
 #ifndef WIFI_DRIVER_MODULE_NAME
-#define WIFI_DRIVER_MODULE_NAME         "wlan"
+//#define WIFI_DRIVER_MODULE_NAME         "wlan"
+#define WIFI_DRIVER_MODULE_NAME      "dhd"
 #endif
+/* qianliangliang 20100722 end */
 #ifndef WIFI_DRIVER_MODULE_ARG
 #define WIFI_DRIVER_MODULE_ARG          ""
 #endif
@@ -62,7 +68,16 @@ static char iface[PROPERTY_VALUE_MAX];
 #endif
 #define WIFI_TEST_INTERFACE		"sta"
 
-static const char IFACE_DIR[]           = "/data/system/wpa_supplicant";
+/* qianliangliang 20100724 begin */
+//static const char IFACE_DIR[]           = "/data/system/wpa_supplicant";
+static const char IFACE_DIR[]           = "/data/wpa_supplicant";
+/* qianliangliang 20100724 end */
+/*qianliangliang 20100903 begin*/
+//static const char MAC_TYPE = "00:00:00:00:00:00";
+#ifndef __OBSOLETE__	// Isaac, obsolete
+static const char MAC_ADDR_PATH[]      ="data/wpa_supplicant/mac_addr";
+#endif	// ifndef __OBSOLETE__
+/*qianliangliang 20100903 end*/
 static const char DRIVER_MODULE_NAME[]  = WIFI_DRIVER_MODULE_NAME;
 static const char DRIVER_MODULE_TAG[]   = WIFI_DRIVER_MODULE_NAME " ";
 static const char DRIVER_MODULE_PATH[]  = WIFI_DRIVER_MODULE_PATH;
@@ -74,64 +89,48 @@ static const char SUPP_PROP_NAME[]      = "init.svc.wpa_supplicant";
 static const char SUPP_CONFIG_TEMPLATE[]= "/system/etc/wifi/wpa_supplicant.conf";
 static const char SUPP_CONFIG_FILE[]    = "/data/misc/wifi/wpa_supplicant.conf";
 static const char MODULE_FILE[]         = "/proc/modules";
-
-static int insmod(const char *filename, const char *args)
+/* qianliangliang 20100724 begin add */
+static const char CONFIG_UP_NAME[]		= "wifi_up";
+static const char CONFIG_DOWN_NAME[]    = "wifi_down";
+/* qianliangliang 20100724 end add */
+/*dingxifeng add set_wifi_power interface  20091021 begin*/
+static const char WIFI_POWER_PATH[]="/sys/devices/platform/bcm4329-pm-driver/power_state";
+static const char *off_state = "off";
+static const char *on_state = "on";
+static int set_wifi_power(int on) 
 {
-    void *module;
-    unsigned int size;
-    int ret;
-
-    module = load_file(filename, &size);
-    if (!module)
-        return -1;
-
-    ret = init_module(module, size, args);
-
-    free(module);
-
-    return ret;
-}
-
-static int rmmod(const char *modname)
-{
+    int fd = -1;
     int ret = -1;
-    int maxtry = 10;
-
-    while (maxtry-- > 0) {
-        ret = delete_module(modname, O_NONBLOCK | O_EXCL);
-        if (ret < 0 && errno == EAGAIN)
-            usleep(500000);
-        else
-            break;
+    char buf[6];
+    int len;
+    fd = open(WIFI_POWER_PATH, O_WRONLY);
+    LOGE("set_wifi_power fd=%d\n",fd);
+    if (fd < 0) {
+        LOGE("open(%s) for write failed: %s (%d)", WIFI_POWER_PATH,
+             strerror(errno), errno);
+        goto out;
     }
-
-    if (ret != 0)
-        LOGD("Unable to unload driver module \"%s\": %s\n",
-             modname, strerror(errno));
+    if(on)
+        len = sprintf(buf, on_state);
+    else
+        len = sprintf(buf, off_state);
+        
+    len = write(fd, buf, len);
+    if(len < 0) {
+         LOGE("write(%s) failed: %s (%d)", WIFI_POWER_PATH, strerror(errno),
+                errno);
+            goto out;
+    }
+    LOGE("set wifi power WIFI_POWER_PATH %s",WIFI_POWER_PATH);
+    
+    return 0;
+out:
+    if (fd >= 0) 
+        close(fd);
     return ret;
 }
+/*dingxifeng add set_wifi_power interface  20091021 end*/
 
-int do_dhcp_request(int *ipaddr, int *gateway, int *mask,
-                    int *dns1, int *dns2, int *server, int *lease) {
-    /* For test driver, always report success */
-    if (strcmp(iface, WIFI_TEST_INTERFACE) == 0)
-        return 0;
-
-    if (ifc_init() < 0)
-        return -1;
-
-    if (do_dhcp(iface) < 0) {
-        ifc_close();
-        return -1;
-    }
-    ifc_close();
-    get_dhcp_info(ipaddr, gateway, mask, dns1, dns2, server, lease);
-    return 0;
-}
-
-const char *get_dhcp_error_string() {
-    return dhcp_lasterror();
-}
 
 static int check_driver_loaded() {
     char driver_status[PROPERTY_VALUE_MAX];
@@ -164,6 +163,277 @@ static int check_driver_loaded() {
     return 0;
 }
 
+#ifndef __OBSOLETE__	// Isaac, obsolete
+/*qianliangliang add begin 20100903:add getMacAddress method*/
+static int set_mac_address(char *buf,int size)
+{
+	int fd = -1;
+	int len = 0;
+	fd = open(MAC_ADDR_PATH,O_WRONLY|O_CREAT,0777);
+	if(fd < 0) {
+		goto out;
+	}
+
+	len = write(fd,buf,size);
+	if(len < 0)
+	{
+		goto out;
+	}
+	close(fd);
+	return 0;	
+out:
+	if(fd >= 0)
+	{
+		close(fd);
+	}
+	return -1;
+}
+#else	// ifndef __OBSOLETE__
+/* Isaac 20110602 begin, for sharing MAC to BT */
+static void set_mac_address(char *buf)
+{
+	char mac_env[24];
+	property_get(ENV_MACADDR, mac_env, NULL);
+	LOGD("===== %s: %s =====", ENV_MACADDR, mac_env);
+	if (strcasecmp(buf, mac_env) != 0) {
+		LOGI("===== Set MAC addr: %s =====", buf);
+		property_set(ENV_MACADDR, buf);
+	}
+
+	return;
+}
+/* Isaac 20110602 end, for sharing MAC to BT */
+#endif	// ifndef __OBSOLETE__
+ static int get_mac_by_wifi(char *buf, int len)
+{
+	char mac_buf[30]={'\0'};
+//	wifi_load_driver();
+//	wifi_start_supplicant();
+	int ret = -1;
+	int i = 0;
+	int off = 10;
+	
+	ret= wifi_command("DRIVER MACADDR",mac_buf,&len);
+	if(ret==0)
+	{
+		while((mac_buf[i+off]!='\0')&&(i<17)){
+			buf[i]=mac_buf[i+off];
+			i++;
+		}
+		buf[i]='\0';
+#ifndef __OBSOLETE__	// Isaac, obsolete
+		if(set_mac_address(buf,len)!=0)
+		{
+			return -1;
+		}
+#else
+		set_mac_address(buf);
+#endif
+	} else {
+		return -1;
+	}
+	return 0;
+
+}
+
+#ifndef __OBSOLETE__	// Isaac, obsolete
+static int check_mac_exist(char *buf,int size)
+{
+	
+	int fd = -1;
+	int len = 0;
+	fd = open(MAC_ADDR_PATH,O_RDWR);
+	if(fd < 0) {
+		goto out;
+	}
+
+	len = read(fd,buf,size);
+	LOGD("=========check_mac_exitst len=%d",len);
+	if(len < 0)
+	{
+		goto out;
+	}
+	else if(len > 0)
+	{
+		close(fd);
+		return 0;
+	}
+	else
+	{
+		close(fd);
+		return -1;
+	}
+
+
+out:
+	if(fd >= 0)
+	{
+		close(fd);
+	}
+	return -1;
+}
+#endif	// ifndef __OBSOLETE__
+
+ int get_mac_address(char *buf){
+	int fd = -1;
+	int len = 0;
+	int ret =-1;
+	int driver_ret = -1;
+	int start_supplicant = -1;
+	int connect_supplicant = -1;
+	int connect_index = 0;
+
+	LOGD("===== %s: %s =====", __FILE__, __func__);
+#ifndef __OBSOLETE__	// Isaac, obsolete
+	if(check_mac_exist(buf,30)==0)
+	{
+		return 0;
+	}
+	else
+	{
+#endif	// ifndef __OBSOLETE__
+		if(check_driver_loaded())
+		{
+			ret = get_mac_by_wifi(buf,30);
+
+			if(ret!=0)
+			{			
+				return -1;
+			}
+			else
+			{
+				return 0;
+			}
+		}
+		else
+		{
+			driver_ret=wifi_load_driver();
+			if(driver_ret!=0) 
+			{
+				goto out;
+			}
+
+			start_supplicant = wifi_start_supplicant();
+			if(start_supplicant!=0) 
+			{
+				goto out;
+			}
+
+			while(connect_index<5)
+			{
+				if(wifi_connect_to_supplicant()==0)
+				{
+					break;
+				}
+				connect_index++;
+				sleep(1);
+			}
+			if(connect_index>=5)
+				goto out;
+
+			ret = get_mac_by_wifi(buf,30);	
+
+			wifi_stop_supplicant();
+			wifi_unload_driver();
+			
+			if(ret!=0)
+			{			
+				return -1;
+			}
+			else
+			{
+				return 0;
+			}
+		}
+#ifndef __OBSOLETE__	// Isaac, obsolete
+	}
+#endif	// ifndef __OBSOLETE__
+
+out:
+	if(start_supplicant==0) 
+	{
+		wifi_stop_supplicant();
+	}
+
+	if(driver_ret==0)
+	{
+		wifi_unload_driver();
+	}
+	
+	return -1;
+}
+
+/*qianliangliang add end 20100903*/
+
+static int insmod(const char *filename, const char *args)
+{
+    void *module;
+    unsigned int size;
+    int ret;
+
+    module = load_file(filename, &size);
+    if (!module)
+        return -1;
+
+    ret = init_module(module, size, args);
+
+    free(module);
+
+    /* qianliangliang 20100724 begin add */
+//	if (ret == 0)
+//		property_set("ctl.start", CONFIG_UP_NAME);
+    /* qianliangliang 20100724 end add */
+
+    return ret;
+}
+
+static int rmmod(const char *modname)
+{
+    int ret = -1;
+    int maxtry = 10;
+
+    while (maxtry-- > 0) {
+        ret = delete_module(modname, O_NONBLOCK | O_EXCL);
+        if (ret < 0 && errno == EAGAIN)
+            usleep(500000);
+        else
+            break;
+    }
+
+	/* qianliangliang 20100724 begin add */
+//	if (ret == 0)
+//		property_set("ctl.start", CONFIG_DOWN_NAME);
+	/* qianliangliang 20100724 end add */
+    
+    if (ret != 0)
+        LOGD("Unable to unload driver module \"%s\": %s\n",
+             modname, strerror(errno));
+    return ret;
+}
+
+int do_dhcp_request(int *ipaddr, int *gateway, int *mask,
+                    int *dns1, int *dns2, int *server, int *lease) {
+    /* For test driver, always report success */
+    if (strcmp(iface, WIFI_TEST_INTERFACE) == 0)
+        return 0;
+
+    if (ifc_init() < 0)
+        return -1;
+
+    if (do_dhcp(iface) < 0) {
+        ifc_close();
+        return -1;
+    }
+    ifc_close();
+    get_dhcp_info(ipaddr, gateway, mask, dns1, dns2, server, lease);
+    return 0;
+}
+
+const char *get_dhcp_error_string() {
+    return dhcp_lasterror();
+}
+
+
 int wifi_load_driver()
 {
     char driver_status[PROPERTY_VALUE_MAX];
@@ -172,7 +442,9 @@ int wifi_load_driver()
     if (check_driver_loaded()) {
         return 0;
     }
-
+/*dingxifeng add set_wifi_power interface  20091021 begin*/
+    //set_wifi_power(1);
+/*dingxifeng add set_wifi_power interface  20091021 end*/
     if (insmod(DRIVER_MODULE_PATH, DRIVER_MODULE_ARG) < 0)
         return -1;
 
@@ -211,6 +483,9 @@ int wifi_unload_driver()
     	    usleep(500000);
 	}
 	if (count) {
+/*dingxifeng add set_wifi_power interface  20091021 begin*/
+	   //set_wifi_power(0);
+/*dingxifeng add set_wifi_power interface  20091021 end*/
     	    return 0;
 	}
 	return -1;
@@ -271,6 +546,7 @@ int wifi_start_supplicant()
 {
     char supp_status[PROPERTY_VALUE_MAX] = {'\0'};
     int count = 200; /* wait at most 20 seconds for completion */
+	char buf[35];
 #ifdef HAVE_LIBC_SYSTEM_PROPERTIES
     const prop_info *pi;
     unsigned serial = 0;
@@ -360,6 +636,8 @@ int wifi_connect_to_supplicant()
 {
     char ifname[256];
     char supp_status[PROPERTY_VALUE_MAX] = {'\0'};
+	char buf[30];
+
 
     /* Make sure supplicant is running */
     if (!property_get(SUPP_PROP_NAME, supp_status, NULL)
@@ -394,6 +672,19 @@ int wifi_connect_to_supplicant()
         ctrl_conn = monitor_conn = NULL;
         return -1;
     }
+	
+#ifndef __OBSOLETE__	// Isaac, obsolete
+/*qianliangliang add 20100906 begin*/
+	if(access(MAC_ADDR_PATH,0)!=0) {
+		get_mac_by_wifi(buf,30);
+	} else {
+
+	}
+
+/*qianliangliang add 20100906 end*/
+#else	// ifndef __OBSOLETE__
+    get_mac_by_wifi(buf, 30);
+#endif	// ifndef __OBSOLETE__
     return 0;
 }
 

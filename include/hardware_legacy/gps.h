@@ -160,8 +160,15 @@ typedef struct {
 typedef struct {
         /** Number of SVs currently visible. */
         int         num_svs;
-
+	  
         /** Contains an array of SV information. */
+	    /** guanxiaowei 20100805 begin:add this variable 
+		 * represents the increase in the number of satellites 
+		 * being used */
+        int         num_used_svs;
+        /** guanxiaowei 20100805 end:add this variable 
+	    * represents the increase in the number of satellites 
+	    * being used*/
         GpsSvInfo   sv_list[GPS_MAX_SVS];
 
         /** Represents a bit mask indicating which SVs

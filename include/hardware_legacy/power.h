@@ -38,6 +38,10 @@ int set_screen_state(int on);
 
 // set how long to stay awake after the last user activity in seconds
 int set_last_user_activity_timeout(int64_t delay);
+//#ifdef SLSI_S5P6442
+// turn if you want to use DVFS(Dynamic Voltage Frequency Scaling) on, false if you want it off
+int set_cpufreq_state(int on);
+//#endif
 
 
 #if __cplusplus
