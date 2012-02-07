@@ -21,6 +21,12 @@
 extern "C" {
 #endif
 
+//For save global mac address
+#define ENV_MACADDR	"dev.macaddr"
+#define CYBERTAN_ID	"00:01:36:"
+#define MAC_ID_LEN	9
+#define MAC_ADDR_LEN	17
+
 /**
  * Load the Wi-Fi driver.
  *
