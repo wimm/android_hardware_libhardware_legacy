@@ -75,7 +75,7 @@ static char iface[PROPERTY_VALUE_MAX];
 #define WIFI_DRIVER_FW_PATH_PARAM	"/sys/module/wlan/parameters/fwpath"
 #endif
 
-#define WIFI_DRIVER_LOADER_DELAY	1000000
+#define WIFI_DRIVER_LOADER_DELAY	2000000
 
 static const char IFACE_DIR[]           = "/data/system/wpa_supplicant";
 #ifdef WIFI_DRIVER_MODULE_PATH
@@ -125,7 +125,7 @@ static int rmmod(const char *modname)
     while (maxtry-- > 0) {
         ret = delete_module(modname, O_NONBLOCK | O_EXCL);
         if (ret < 0 && errno == EAGAIN)
-            usleep(500000);
+            usleep(700000);
         else
             break;
     }
@@ -193,6 +193,137 @@ int is_wifi_driver_loaded() {
 #else
     return 1;
 #endif
+}
+
+
+static void set_mac_address(char *buf)
+{
+	char mac_env[24];
+	property_get(ENV_MACADDR, mac_env, NULL);
+	LOGD("===== %s: %s =====", ENV_MACADDR, mac_env);
+	if (strcasecmp(buf, mac_env) != 0) {
+		LOGI("===== Set MAC addr: %s =====", buf);
+		property_set(ENV_MACADDR, buf);
+	}
+
+	return;
+}
+
+ static int get_mac_by_wifi(char *buf, int len)
+{
+	char mac_buf[30]={'\0'};
+	int ret = -1;
+	int i = 0;
+	int off = 10;
+	
+	ret= wifi_command("DRIVER MACADDR",mac_buf,&len);
+	if(ret==0)
+	{
+		while((mac_buf[i+off]!='\0')&&(i<17)){
+			buf[i]=mac_buf[i+off];
+			i++;
+		}
+		buf[i]='\0';
+		set_mac_address(buf);
+
+	} else {
+		return -1;
+	}
+	return 0;
+
+}
+
+
+
+ int get_mac_address(char *buf){
+	int fd = -1;
+	int len = 0;
+	int ret =-1;
+	int driver_ret = -1;
+	int start_supplicant = -1;
+	int connect_supplicant = -1;
+	int connect_index = 0;
+
+	LOGD("===== %s: %s =====", __FILE__, __func__);
+
+		if(is_wifi_driver_loaded())
+		{
+			start_supplicant = wifi_start_supplicant();
+			if(start_supplicant!=0) 
+			{
+				goto out;
+			}
+			while(connect_index<5)
+			{
+				if(wifi_connect_to_supplicant()==0)
+				{
+					break;
+				}
+				connect_index++;
+				sleep(1);
+			}
+			if(connect_index>=5)
+				goto out;
+			ret = get_mac_by_wifi(buf,30);	
+			wifi_stop_supplicant();
+				if(ret!=0)
+				{			
+					return -1;
+				}
+				else
+				{
+				return 0;
+			}
+		}
+		else
+		{
+			driver_ret=wifi_load_driver();
+			if(driver_ret!=0) 
+			{
+				goto out;
+			}
+			start_supplicant = wifi_start_supplicant();
+			if(start_supplicant!=0) 
+			{
+				goto out;
+			}
+			while(connect_index<5)
+			{
+				if(wifi_connect_to_supplicant()==0)
+				{
+					break;
+				}
+				connect_index++;
+				sleep(1);
+			}
+			if(connect_index>=5)
+				goto out;
+			ret = get_mac_by_wifi(buf,30);	
+			wifi_stop_supplicant();
+			wifi_unload_driver();
+			if(ret!=0)
+			{			
+				return -1;
+			}
+			else
+			{
+				return 0;
+			}
+		}
+
+
+out:
+	if(start_supplicant==0) 
+	{
+		wifi_stop_supplicant();
+	}
+
+	if(driver_ret==0)
+	{
+		wifi_unload_driver();
+	}
+	
+	return -1;
 }
 
 int wifi_load_driver()
